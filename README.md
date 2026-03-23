@@ -1,42 +1,44 @@
 # browser-cdp
 
+<!--
+Language: **English** (default) | [中文](#中文说明)
+Click the language link to jump to your section.
+-->
+
+## English
+
 > Real Chrome browser automation for OpenClaw — access pages with full user login state, bypass anti-bot detection, perform interactive operations.
 
-**中文说明请往下翻。**
+### What is this?
 
-## What is this?
+`browser-cdp` connects directly to your local Chrome via Chrome DevTools Protocol (CDP), giving AI agents the ability to:
 
-`browser-cdp` is an OpenClaw skill that connects directly to your local Chrome browser via Chrome DevTools Protocol (CDP), giving AI agents the ability to:
-
-- Access pages **with your full login state** (cookies, sessions)
+- **Access pages with your full login state** (cookies, sessions)
 - **Bypass anti-bot detection** that blocks static fetchers
 - **Interact** with pages (click, fill forms, scroll, drag)
 - **Extract dynamic content** from JavaScript-rendered pages
 - **Take screenshots** at any point
 
-## Architecture
+### Architecture
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                     Chrome Browser                    │
-│                  (with debugging port)               │
-│              ws://localhost:9222/devtools/...        │
-└──────────────────────┬───────────────────────────────┘
+┌─────────────────────────────────────────────────────┐
+│         Chrome (remote-debugging-port=9222)          │
+│            ws://localhost:9222/devtools/...          │
+└──────────────────────┬──────────────────────────────┘
                        │ CDP (WebSocket)
-┌──────────────────────▼───────────────────────────────┐
-│                   CDP Proxy                          │
+┌──────────────────────▼──────────────────────────────┐
+│                  CDP Proxy                            │
 │  cdp-proxy.mjs — HTTP API on localhost:3456          │
-│  - Bridges HTTP (from OpenClaw) ↔ WebSocket (to CDP) │
-│  - Target/tab management                             │
-│  - Mouse/keyboard simulation                          │
-└──────────────────────┬───────────────────────────────┘
+│  Bridges: HTTP (OpenClaw) ↔ WebSocket (Chrome CDP)  │
+└──────────────────────┬──────────────────────────────┘
                        │ HTTP REST API
-┌──────────────────────▼───────────────────────────────┐
+┌──────────────────────▼──────────────────────────────┐
 │              OpenClaw AI Agent                       │
-└──────────────────────────────────────────────────────┘
+└─────────────────────────────────────────────────────┘
 ```
 
-## Prerequisites
+### Prerequisites
 
 - **Node.js 22+** (uses native WebSocket)
 - **Google Chrome** with remote debugging enabled
@@ -47,27 +49,26 @@
 # Kill existing Chrome completely
 pkill -9 "Google Chrome"
 
-# Start Chrome with debugging port (use a separate profile)
+# Start Chrome with debugging port (use full binary path — NOT `open -a`)
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --remote-debugging-port=9222 \
   --user-data-dir=/tmp/chrome-debug-profile \
   --no-first-run &
 ```
 
-Verify with:
+Verify:
 ```bash
 curl -s http://127.0.0.1:9222/json/version
 ```
 
-## Installation
+### Installation
 
 ```bash
-# Clone into OpenClaw skills directory
 git clone https://github.com/0xcjl/browser-cdp.git \
   ~/.openclaw/skills/browser-cdp
 ```
 
-## Start CDP Proxy
+### Start CDP Proxy
 
 ```bash
 node ~/.openclaw/skills/browser-cdp/scripts/cdp-proxy.mjs &
@@ -76,7 +77,7 @@ curl -s http://localhost:3456/health
 # {"status":"ok","connected":true,"sessions":0,"chromePort":9222}
 ```
 
-## API Reference
+### API Reference
 
 ```bash
 # List all tabs
@@ -85,7 +86,7 @@ curl -s http://localhost:3456/targets
 # Open URL in new tab
 curl -s "http://localhost:3456/new?url=https://example.com"
 
-# Execute JavaScript (read DOM / read properties / interact)
+# Execute JavaScript (read DOM / read properties)
 curl -s -X POST "http://localhost:3456/eval?target=TARGET_ID" \
   -d 'document.title'
 
@@ -93,7 +94,7 @@ curl -s -X POST "http://localhost:3456/eval?target=TARGET_ID" \
 curl -s -X POST "http://localhost:3456/click?target=TARGET_ID" \
   -d 'button.submit'
 
-# Real mouse click (triggers hover states, file dialogs, etc.)
+# Real mouse click (triggers hover states, file dialogs)
 curl -s -X POST "http://localhost:3456/clickAt?target=TARGET_ID" \
   -d '.upload-btn'
 
@@ -110,11 +111,11 @@ curl -s "http://localhost:3456/navigate?target=TARGET_ID&url=https://..."
 curl -s "http://localhost:3456/close?target=TARGET_ID"
 ```
 
-## Tool Selection Strategy
+### Tool Selection Strategy
 
 | Scenario | Recommended | Why |
 |----------|-------------|-----|
-| Public pages (GitHub, Wikipedia, blogs) | `agent-reach` / WebFetch | Fast, low token, structured output |
+| Public pages (GitHub, Wikipedia, blogs) | `agent-reach` / WebFetch | Fast, low token, structured |
 | **Search results** (Bing/Google/YouTube) | **`browser-cdp`** | agent-reach gets blocked |
 | **Login-gated content** | **`browser-cdp`** | agent-reach has no cookies |
 | JavaScript-rendered pages | **`browser-cdp`** | Reads rendered DOM directly |
@@ -128,14 +129,14 @@ curl -s "http://localhost:3456/close?target=TARGET_ID"
 3. browser-cdp still fails → agent-reach fallback + record in site-patterns
 ```
 
-## Three-Layer Architecture
+### Three-Layer Architecture
 
 This tool is part of a three-layer web access strategy:
 
 ```
 Layer 1 — agent-reach (Jina)
   → GitHub, Wikipedia, public blogs/articles
-  → Speed: ~1-2s, token: minimal, structured output
+  → ~1-2s, minimal token, structured output
 
 Layer 2 — browser-cdp (CDP)
   → Search results (Google/Bing), YouTube, Twitter, login-gated pages
@@ -146,16 +147,16 @@ Layer 3 — agent-browser (OpenClaw isolated browser)
   → No Chrome setup, doesn't affect your browser
 ```
 
-## Known Limitations
+### Known Limitations
 
-- Chrome must use a **separate profile** (`/tmp/chrome-debug-profile`), not your daily browser profile
+- Chrome must use a **separate profile** (`/tmp/chrome-debug-profile`), not your daily profile
 - Parallel operations on the same site may get rate-limited
 - Node.js 22+ required (uses native WebSocket)
-- On macOS, Chrome must be started with the **full path** (not `open -a`), or debugging port won't bind
+- On macOS, Chrome must be started with the **full binary path** (`open -a` does NOT pass args)
 
-## Site Patterns
+### Site Patterns
 
-When you encounter a new website, record its characteristics:
+Record experience with new websites:
 
 ```bash
 ~/.openclaw/skills/browser-cdp/references/site-patterns/
@@ -163,41 +164,35 @@ When you encounter a new website, record its characteristics:
 
 Filename: `{domain}.md`
 
-Example:
+Example (`github.com.md`):
 ```markdown
 # github.com
 
 ## Login State
 - Logged-in: `document.querySelector('.header-body')` exists
-- Login page: redirects to github.com/login
+- Redirects to login page if not authenticated
 
 ## Anti-bot
 - Raw GitHub pages work fine via Jina
 - API calls require authentication
 
 ## Notes
-- Uses lazy loading for file trees
-- Scroll to bottom to load more
+- Lazy loads file trees — scroll to bottom
 ```
 
-## Usage Log
+### Usage Log
 
-Track each use to optimize over time:
+Track each use for continuous optimization:
 
 ```bash
 ~/.openclaw/skills/browser-cdp/references/usage-log.md
 ```
 
-Format:
-```markdown
-### YYYY-MM-DD | [Task Type] | [URL/Website] | [Result: success/fail/degrade] | [Notes]
-```
+### Troubleshooting
 
-## Troubleshooting
-
-**Chrome debugging port not opening?**
+**Chrome debugging port won't open?**
 ```bash
-# macOS requires full path — "open -a" does NOT pass arguments correctly
+# macOS requires full path — "open -a" does NOT pass arguments
 pkill -9 "Google Chrome"; sleep 2
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --remote-debugging-port=9222 \
@@ -206,93 +201,60 @@ pkill -9 "Google Chrome"; sleep 2
 
 **Proxy connection fails?**
 ```bash
-# Check Chrome is responding
-curl -s http://127.0.0.1:9222/json/version
-
-# Restart proxy
+curl -s http://127.0.0.1:9222/json/version  # confirm Chrome responds
 pkill -f cdp-proxy.mjs
 node ~/.openclaw/skills/browser-cdp/scripts/cdp-proxy.mjs &
 ```
 
-## Origin
+### Origin
 
-This skill was adapted from [eze-is/web-access](https://github.com/eze-is/web-access) (MIT license), redesigned for OpenClaw's skill format and tool selection philosophy. A bug in the original (`require()` used in ES module context) was [reported](https://github.com/eze-is/web-access/issues/10) and fixed in this version.
-
-## License
-
-MIT — same as the original project.
+Adapted from [eze-is/web-access](https://github.com/eze-is/web-access) (MIT license), redesigned for OpenClaw's skill format and tool selection philosophy. A bug in the original (`require()` in ES module context) was [reported](https://github.com/eze-is/web-access/issues/10) and fixed in this version.
 
 ---
 
----
+## 🀄 中文说明
 
-# browser-cdp
+> **English version above / 英文说明往上翻**
 
-> 面向 OpenClaw 的真实浏览器自动化工具 —— 以用户登录态访问页面、绕过反爬检测、执行交互操作。
+### 是什么？
 
-## 是什么？
+`browser-cdp` 通过 Chrome DevTools Protocol (CDP) 直连你本地的 Chrome，让 AI Agent 能够：
 
-`browser-cdp` 是一个 OpenClaw skill，通过 Chrome DevTools Protocol (CDP) 直连你本地的 Chrome 浏览器，让 AI Agent 能够：
+- **携带完整登录态** — cookies 和 sessions 全部保留
+- **绕过反爬检测** — 搜索结果页、视频平台等静态抓取被拦截的页面
+- **执行交互操作** — 点击、填表、滚动、拖拽、文件上传
+- **提取动态内容** — 读取 JavaScript 渲染后的 DOM
+- **随时截图** — 任意时间点截取页面
 
-- **携带完整登录态**访问页面（cookies、sessions）
-- **绕过反爬检测**（静态抓取被拦截的页面）
-- **执行交互操作**（点击、填表、滚动、拖拽）
-- **提取动态内容**（JavaScript 渲染后的 DOM）
-- **随时截图**
-
-## 架构
+### 架构
 
 ```
-┌──────────────────────────────────────────────────────┐
-│                     Chrome 浏览器                    │
-│               （已开启远程调试端口）                  │
-│              ws://localhost:9222/devtools/...        │
-└──────────────────────┬───────────────────────────────┘
-                       │ CDP (WebSocket)
-┌──────────────────────▼───────────────────────────────┐
-│                   CDP Proxy                          │
-│  cdp-proxy.mjs — HTTP API (localhost:3456)           │
-│  - HTTP (来自 OpenClaw) ↔ WebSocket (到 CDP) 桥接   │
-│  - 目标/标签页管理                                    │
-│  - 鼠标/键盘模拟                                      │
-└──────────────────────┬───────────────────────────────┘
-                       │ HTTP REST API
-┌──────────────────────▼───────────────────────────────┐
-│              OpenClaw AI Agent                       │
-└──────────────────────────────────────────────────────┘
+Chrome (remote-debugging-port=9222)
+    ↓ CDP WebSocket
+CDP Proxy (cdp-proxy.mjs) — HTTP API (localhost:3456)
+    ↓ HTTP REST
+OpenClaw AI Agent
 ```
 
-## 前置条件
-
-- **Node.js 22+**
-- **Google Chrome** 已开启远程调试
-
-### Chrome 启动（macOS）
-
-```bash
-# 先彻底退出 Chrome
-pkill -9 "Google Chrome"
-
-# 用独立 profile 启动（调试端口必须用完整路径）
-"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-  --remote-debugging-port=9222 \
-  --user-data-dir=/tmp/chrome-debug-profile \
-  --no-first-run &
-```
-
-验证：
-```bash
-curl -s http://127.0.0.1:9222/json/version
-```
-
-## 安装
+### 安装配置
 
 ```bash
 git clone https://github.com/0xcjl/browser-cdp.git \
   ~/.openclaw/skills/browser-cdp
 ```
 
-## 启动 CDP Proxy
+### 启动 Chrome（macOS）
+
+```bash
+# 必须用完整二进制路径，不能用 open -a
+pkill -9 "Google Chrome"; sleep 2
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --remote-debugging-port=9222 \
+  --user-data-dir=/tmp/chrome-debug-profile \
+  --no-first-run &
+```
+
+### 启动 CDP Proxy
 
 ```bash
 node ~/.openclaw/skills/browser-cdp/scripts/cdp-proxy.mjs &
@@ -301,69 +263,61 @@ curl -s http://localhost:3456/health
 # {"status":"ok","connected":true,"sessions":0,"chromePort":9222}
 ```
 
-## API 参考
+### API 参考
 
 ```bash
 # 列出所有标签页
 curl -s http://localhost:3456/targets
 
-# 新建标签（后台打开）
+# 新建标签
 curl -s "http://localhost:3456/new?url=https://example.com"
 
-# 执行 JS（读 DOM / 读属性 / 操控元素）
+# 执行 JS
 curl -s -X POST "http://localhost:3456/eval?target=TARGET_ID" \
   -d 'document.title'
 
-# JS 点击（快速，推荐优先）
+# JS 点击（快速，推荐）
 curl -s -X POST "http://localhost:3456/click?target=TARGET_ID" \
   -d 'button.submit'
 
-# 真实鼠标点击（触发 hover、文件对话框等）
+# 真实鼠标点击
 curl -s -X POST "http://localhost:3456/clickAt?target=TARGET_ID" \
   -d '.upload-btn'
 
 # 截图
 curl -s "http://localhost:3456/screenshot?target=TARGET_ID&file=/tmp/shot.png"
 
-# 滚动（触发懒加载）
+# 滚动
 curl -s "http://localhost:3456/scroll?target=TARGET_ID&direction=bottom"
 
-# 导航到新 URL
+# 导航
 curl -s "http://localhost:3456/navigate?target=TARGET_ID&url=https://..."
 
 # 关闭标签
 curl -s "http://localhost:3456/close?target=TARGET_ID"
 ```
 
-## 工具选择策略（三层分工）
+### 工具选择：三层分工
 
-| 场景 | 推荐工具 | 原因 |
-|------|---------|------|
-| 公开页面（GitHub、Wikipedia、博客） | `agent-reach` / WebFetch | 速度快、token 少、结构化 |
+| 场景 | 工具 | 原因 |
+|------|------|------|
+| 公开页面（GitHub、Wikipedia、博客） | `agent-reach` | 速度快、token 少、结构化 |
 | **搜索结果页**（Bing/Google/YouTube） | **`browser-cdp`** | agent-reach 被反爬拦截 |
 | **登录态私有内容** | **`browser-cdp`** | agent-reach 无 cookies |
-| JavaScript 渲染页 | **`browser-cdp`** | 直接读取渲染后 DOM |
-| 简单自动化、截图验证 | `agent-browser` | 无需配置 Chrome |
+| JavaScript 渲染页 | **`browser-cdp`** | 直接读渲染后 DOM |
+| 简单自动化、隔离截图 | `agent-browser` | 无需配置 Chrome |
 | 大规模并行采集 | `agent-reach` + 并行 | browser-cdp 易被限速 |
 
-**判断顺序：**
-```
-1. 公开内容 → agent-reach（快、便宜）
-2. 搜索结果 / 被反爬拦截 → browser-cdp
-3. 仍失败 → agent-reach 备选 + 记录到 site-patterns
-```
+### 已知局限
 
-## 已知局限
-
-- Chrome 必须使用**独立 profile**（`/tmp/chrome-debug-profile`），不能共用日常浏览器
-- 同一站点的多个标签页并行操作容易被限速
+- Chrome 必须使用**独立 profile**（`/tmp/chrome-debug-profile`）
+- 同一站点并行标签页容易被限速
 - Node.js 22+（使用原生 WebSocket）
-- macOS 上必须用**完整路径**启动 Chrome（`open -a` 无法正确传递参数）
+- macOS 必须用**完整路径**启动 Chrome
 
-## 起源
+### License
 
-本 skill 从 [eze-is/web-access](https://github.com/eze-is/web-access)（MIT 协议）提取并针对 OpenClaw 重新设计。原项目有一个 bug（在 ES module 中使用 `require()`）已 [报告给作者](https://github.com/eze-is/web-access/issues/10)，本版本已修复。
+MIT — same as [eze-is/web-access](https://github.com/eze-is/web-access).
+TABEND
 
-## License
-
-MIT
+echo "Tabbed README prepared, lines: $(wc -l < /tmp/readme-tabbed.md)"
